@@ -13,7 +13,20 @@ export default function JobDetail() {
   const [applying, setApplying] = useState(false);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [appCount, setAppCount] = useState(0);
-  const [appForm, setAppForm] = useState({ coverLetter: '', resumeUrl: '' });
+  const [appForm, setAppForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    areaCity: '',
+    district: '',
+    pincode: '',
+    collegeName: '',
+    tenthPercent: '',
+    twelfthPercent: '',
+    ugPercent: '',
+    resumeUrl: '',
+    coverLetter: ''
+  });
   const [alreadyApplied, setAlreadyApplied] = useState(false);
   const [myApplication, setMyApplication] = useState(null);
   const { user, isLoggedIn } = useAuth();
@@ -85,6 +98,28 @@ export default function JobDetail() {
     };
   }, [id, isLoggedIn, isCandidate, authUserId, profilePk]);
 
+  const openApplyModal = () => {
+    if (!isLoggedIn) {
+      navigate('/login');
+      return;
+    }
+    setAppForm({
+      fullName: user?.fullName || user?.name || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      areaCity: user?.location || '',
+      district: '',
+      pincode: '',
+      collegeName: '',
+      tenthPercent: '',
+      twelfthPercent: '',
+      ugPercent: '',
+      resumeUrl: user?.resumeUrl || '',
+      coverLetter: ''
+    });
+    setShowApplyModal(true);
+  };
+
   const handleApply = async (e) => {
     e.preventDefault();
     if (!isLoggedIn) { navigate('/login'); return; }
@@ -98,13 +133,31 @@ export default function JobDetail() {
       return;
     }
 
+    const {
+      fullName, email, phone, areaCity, district, pincode,
+      collegeName, tenthPercent, twelfthPercent, ugPercent,
+      resumeUrl, coverLetter
+    } = appForm;
+
+    // Validation
+    if (!fullName.trim()) { toast.error('Full Name is required'); return; }
+    if (!email.trim()) { toast.error('Email is required'); return; }
+    if (!phone.trim()) { toast.error('Phone number is required'); return; }
+    if (!resumeUrl.trim()) { toast.error('Resume URL is required'); return; }
+    if (!collegeName.trim()) { toast.error('College Name is required'); return; }
+
     setApplying(true);
     try {
       await applicationAPI.submitApplication({
         jobId: parseInt(id),
         candidateId,
-        coverLetter: appForm.coverLetter,
-        resumeUrl: appForm.resumeUrl,
+        ...appForm,
+        // Ensure values are trimmed
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        resumeUrl: resumeUrl.trim(),
+        coverLetter: coverLetter.trim()
       });
       toast.success('Application submitted successfully! 🎉');
       setShowApplyModal(false);
@@ -113,6 +166,20 @@ export default function JobDetail() {
       setAppCount((c) => c + 1);
     } catch (err) {
       toast.error(getErrorMessage(err, 'Failed to submit application'));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const handleAcceptOffer = async () => {
+    if (!myApplication?.applicationId) return;
+    try {
+      setApplying(true);
+      await applicationAPI.updateStatus(myApplication.applicationId, 'Accepted');
+      toast.success('Offer accepted! Congratulations on your new role! 🎊');
+      setMyApplication(prev => ({ ...prev, status: 'Accepted' }));
+    } catch (err) {
+      toast.error('Failed to accept offer. Please try again.');
     } finally {
       setApplying(false);
     }
@@ -285,7 +352,7 @@ export default function JobDetail() {
                                 const res = await import('../api').then(m => m.interviewAPI.getByApplication(myApplication.applicationId));
                                 const interview = Array.isArray(res.data) ? res.data[0] : res.data;
                                 if (interview?.interviewId) {
-                                  navigate(`/take-interview/${interview.interviewId}`);
+                                  window.open(`/take-interview/${interview.interviewId}`, '_blank');
                                 } else {
                                   toast.error('Interview session not found. Please contact support.');
                                 }
@@ -302,13 +369,29 @@ export default function JobDetail() {
                         </div>
                       )}
 
+                      {myApplication.status === 'Offered' && (
+                        <div style={{ marginBottom: '20px' }}>
+                          <button 
+                            className="btn btn-primary" 
+                            style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)' }}
+                            disabled={applying}
+                            onClick={handleAcceptOffer}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px' }}>
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            {applying ? 'Accepting...' : 'Accept Offer Letter'}
+                          </button>
+                        </div>
+                      )}
+
                       {myApplication.status === 'Rejected' || myApplication.status === 'Withdrawn' ? (
                         <div style={{ textAlign: 'center', fontWeight: 'bold', color: myApplication.status === 'Rejected' ? '#ef4444' : '#64748b' }}>
                           Status: {myApplication.status}
                         </div>
                       ) : (
                         <div className="app-timeline" style={{ flexDirection: 'column', gap: '20px' }}>
-                          {['Applied', 'Shortlisted', 'Interview Scheduled', 'Offered'].map((step, idx, arr) => {
+                          {['Applied', 'Shortlisted', 'Interview Scheduled', 'Offered', 'Accepted'].map((step, idx, arr) => {
                              const currentIdx = arr.indexOf(myApplication.status) >= 0 ? arr.indexOf(myApplication.status) : 0;
                              const isCompleted = idx <= currentIdx;
                              const isActive = idx === currentIdx;
@@ -329,7 +412,7 @@ export default function JobDetail() {
                 <button
                   className="btn btn-primary"
                   style={{ width: '100%', justifyContent: 'center', padding: '13px' }}
-                  onClick={() => (isLoggedIn ? setShowApplyModal(true) : navigate('/login'))}
+                  onClick={openApplyModal}
                 >
                   Apply Now
                 </button>
@@ -352,19 +435,123 @@ export default function JobDetail() {
       {/* Apply Modal */}
       {showApplyModal && (
         <div className="modal-overlay" onClick={() => setShowApplyModal(false)}>
-          <div className="modal fade-in" onClick={e => e.stopPropagation()}>
+          <div className="modal modal-lg fade-in" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Apply for {job.title}</h2>
               <button className="modal-close" onClick={() => setShowApplyModal(false)}>✕</button>
             </div>
-            <form onSubmit={handleApply}>
+            <form onSubmit={handleApply} className="modal-form-grid">
+              
+              <h3 className="form-section-title">Personal Information</h3>
               <div className="form-group">
-                <label>Resume URL</label>
+                <label>Full Name *</label>
+                <input
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={appForm.fullName}
+                  onChange={e => setAppForm({ ...appForm, fullName: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Email Address *</label>
+                <input
+                  type="email"
+                  placeholder="email@example.com"
+                  value={appForm.email}
+                  onChange={e => setAppForm({ ...appForm, email: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Phone Number *</label>
+                <input
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  value={appForm.phone}
+                  onChange={e => setAppForm({ ...appForm, phone: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Area / City</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Model Town, Delhi"
+                  value={appForm.areaCity}
+                  onChange={e => setAppForm({ ...appForm, areaCity: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>District</label>
+                <input
+                  type="text"
+                  placeholder="e.g. North Delhi"
+                  value={appForm.district}
+                  onChange={e => setAppForm({ ...appForm, district: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Pincode</label>
+                <input
+                  type="text"
+                  placeholder="110001"
+                  value={appForm.pincode}
+                  onChange={e => setAppForm({ ...appForm, pincode: e.target.value })}
+                />
+              </div>
+
+              <h3 className="form-section-title">Education Details</h3>
+              <div className="form-group form-group-full">
+                <label>College Name *</label>
+                <input
+                  type="text"
+                  placeholder="University / College Name"
+                  value={appForm.collegeName}
+                  onChange={e => setAppForm({ ...appForm, collegeName: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Class 10th %</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Percentage"
+                  value={appForm.tenthPercent}
+                  onChange={e => setAppForm({ ...appForm, tenthPercent: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Class 12th %</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Percentage"
+                  value={appForm.twelfthPercent}
+                  onChange={e => setAppForm({ ...appForm, twelfthPercent: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>UG %</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Current / Final Percentage"
+                  value={appForm.ugPercent}
+                  onChange={e => setAppForm({ ...appForm, ugPercent: e.target.value })}
+                />
+              </div>
+
+              <h3 className="form-section-title">Application Documents</h3>
+              <div className="form-group form-group-full">
+                <label>Resume URL *</label>
                 <input
                   type="url"
                   placeholder="https://drive.google.com/your-resume"
                   value={appForm.resumeUrl}
                   onChange={e => setAppForm({ ...appForm, resumeUrl: e.target.value })}
+                  required
                 />
                 {!appForm.resumeUrl && user?.resumeUrl && (
                   <div style={{ marginTop: 6, fontSize: '0.8rem', color: 'var(--text3)' }}>
@@ -372,16 +559,17 @@ export default function JobDetail() {
                   </div>
                 )}
               </div>
-              <div className="form-group">
+              <div className="form-group form-group-full">
                 <label>Cover Letter</label>
                 <textarea
-                  rows={5}
+                  rows={4}
                   placeholder="Tell the recruiter why you're a great fit for this role…"
                   value={appForm.coverLetter}
                   onChange={e => setAppForm({ ...appForm, coverLetter: e.target.value })}
                 />
               </div>
-              <div className="modal-actions">
+
+              <div className="modal-actions" style={{ gridColumn: '1 / -1' }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setShowApplyModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={applying}>
                   {applying ? <span className="spinner" /> : null}

@@ -153,6 +153,12 @@
   width: 100%;
   max-width: 500px;
   box-shadow: var(--shadow-lg);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-lg {
+  max-width: 850px;
 }
 
 .modal-header {
@@ -180,6 +186,38 @@
 }
 .modal-close:hover { color: var(--text); background: var(--bg3); }
 
+.modal-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-section-title {
+  grid-column: 1 / -1;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #6366f1;
+  margin: 16px 0 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-section-title::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 16px;
+  background: #6366f1;
+  border-radius: 2px;
+}
+
+.form-group-full {
+  grid-column: 1 / -1;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -195,4 +233,6 @@ textarea {
 @media (max-width: 768px) {
   .jd-layout { grid-template-columns: 1fr; }
   .jd-sidebar { position: static; }
+  .modal-form-grid { grid-template-columns: 1fr; }
+  .modal { padding: 20px; }
 }
