@@ -102,7 +102,22 @@ export default function Notifications() {
                       <span className="badge badge-blue nc-type">{n.type}</span>
                       {!isRead && <span className="nc-dot" />}
                     </div>
-                    <p className="nc-message">{n.message}</p>
+                    <p className="nc-message">{n.message?.split('|').find(p => !p.includes(':')) || n.message}</p>
+                    
+                    {(n.type === 'INTERVIEW_INVITE' || n.type === 'INTERVIEW_UPDATE') && n.message?.includes('Interview ID:') && (
+                      <div className="nc-actions" style={{ marginTop: '12px' }}>
+                        <button 
+                          className="btn btn-primary btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const idMatch = n.message.match(/Interview ID: (\d+)/);
+                            if (idMatch) window.location.href = `/take-interview/${idMatch[1]}`;
+                          }}
+                        >
+                          Take Interview
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <button className="nc-delete" onClick={() => deleteNotif(id)}>✕</button>
                 </div>

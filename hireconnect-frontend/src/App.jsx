@@ -17,6 +17,7 @@ import RecruiterApply from './pages/RecruiterApply';
 import Notifications from './pages/Notifications';
 import Subscription from './pages/Subscription';
 import Profile from './pages/Profile';
+import TakeInterview from './pages/TakeInterview';
 
 const ProtectedRoute = ({ children }) => {
   const { isLoggedIn } = useAuth();
@@ -48,6 +49,7 @@ function AppRoutes() {
         <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/take-interview/:id" element={<ProtectedRoute><TakeInterview /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

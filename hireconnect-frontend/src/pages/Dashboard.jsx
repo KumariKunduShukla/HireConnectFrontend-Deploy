@@ -576,6 +576,27 @@ export default function Dashboard() {
                     )}
                     <div className="app-actions">
                       <Link to={`/jobs/${app.jobId}`} className="btn btn-ghost btn-sm">View Job</Link>
+                      {app.status === 'Interview Scheduled' && (
+                        <button
+                          className="btn btn-primary btn-sm"
+                          style={{ background: 'linear-gradient(135deg, #9333ea 0%, #4f46e5 100%)' }}
+                          onClick={async () => {
+                            try {
+                              const res = await import('../api').then(m => m.interviewAPI.getByApplication(app.applicationId));
+                              const interview = Array.isArray(res.data) ? res.data[0] : res.data;
+                              if (interview?.interviewId) {
+                                window.location.href = `/take-interview/${interview.interviewId}`;
+                              } else {
+                                toast.error('Interview session not found.');
+                              }
+                            } catch {
+                              toast.error('Failed to load interview.');
+                            }
+                          }}
+                        >
+                          Take Interview
+                        </button>
+                      )}
                       {app.status === 'Applied' && (
                         <button
                           className="btn btn-danger btn-sm"

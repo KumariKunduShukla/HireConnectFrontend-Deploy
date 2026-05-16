@@ -246,6 +246,7 @@ export const interviewAPI = {
     api.patch(`/api/v1/interviews/reschedule/${id}?newTime=${encodeURIComponent(newTime)}`),
   cancel: (id) => api.delete(`/api/v1/interviews/cancel/${id}`),
   getByApplication: (appId) => api.get(`/api/v1/interviews/application/${appId}`),
+  takeInterview: (id) => api.post(`/api/v1/interviews/start?id=${id}`),
 };
 
 // ─── NOTIFICATION SERVICE (/api/notifications/**) ─────────────────────────────

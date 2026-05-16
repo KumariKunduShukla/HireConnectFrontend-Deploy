@@ -274,6 +274,34 @@ export default function JobDetail() {
                   {myApplication && (
                     <div className="jd-app-timeline-container" style={{ marginTop: 24, padding: 16, border: '1px solid var(--border)', borderRadius: 12, backgroundColor: '#f8fafc' }}>
                       <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text1)', textAlign: 'center' }}>Application Status Tracker</h4>
+                      
+                      {myApplication.status === 'Interview Scheduled' && (
+                        <div style={{ marginBottom: '20px' }}>
+                          <button 
+                            className="btn btn-primary" 
+                            style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #9333ea 0%, #4f46e5 100%)', boxShadow: '0 4px 12px rgba(147, 51, 234, 0.3)' }}
+                            onClick={async () => {
+                              try {
+                                const res = await import('../api').then(m => m.interviewAPI.getByApplication(myApplication.applicationId));
+                                const interview = Array.isArray(res.data) ? res.data[0] : res.data;
+                                if (interview?.interviewId) {
+                                  navigate(`/take-interview/${interview.interviewId}`);
+                                } else {
+                                  toast.error('Interview session not found. Please contact support.');
+                                }
+                              } catch {
+                                toast.error('Failed to load interview details.');
+                              }
+                            }}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px' }}>
+                              <path d="M15 10l5 5-5 5M4 4v7a4 4 0 004 4h12" />
+                            </svg>
+                            Take Interview Now
+                          </button>
+                        </div>
+                      )}
+
                       {myApplication.status === 'Rejected' || myApplication.status === 'Withdrawn' ? (
                         <div style={{ textAlign: 'center', fontWeight: 'bold', color: myApplication.status === 'Rejected' ? '#ef4444' : '#64748b' }}>
                           Status: {myApplication.status}
