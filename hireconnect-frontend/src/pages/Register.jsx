@@ -2,16 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '../api';
 import toast from 'react-hot-toast';
-import { 
-  User, 
-  Mail, 
-  Lock, 
-  ArrowRight, 
-  CheckCircle2, 
-  ShieldCheck, 
-  Zap, 
-  Briefcase 
-} from 'lucide-react';
+import './Auth.css';
 
 export default function Register() {
   const [step, setStep] = useState(1); // 1=form, 2=otp
@@ -34,7 +25,9 @@ export default function Register() {
     }
     setLoading(true);
     try {
+      // Store name in localStorage for later profile creation
       localStorage.setItem('hc_fullName', form.name);
+      // Send only email and password to auth service (backend UserCredential doesn't have name)
       await authAPI.register({ email: form.email, password: form.password });
       toast.success('OTP sent to your email!');
       setStep(2);
@@ -53,6 +46,7 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     try {
+      // Send only email and password to backend
       await authAPI.verifyOtp(form.email, otp, { email: form.email, password: form.password });
       toast.success('Account created! Please sign in.');
       navigate('/login');
@@ -68,231 +62,163 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
-      {/* Background elements */}
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] animate-pulse"></div>
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[120px] animate-pulse delay-700"></div>
-      </div>
-
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-        {/* Left Section: Branding & Social Proof */}
-        <div className="hidden lg:flex flex-col space-y-12 pr-12 animate-in fade-in slide-in-from-left-8 duration-1000">
-          <div className="space-y-6">
-            <Link to="/" className="flex items-center space-x-3 group">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-xl shadow-blue-600/30 group-hover:scale-110 transition-transform">
-                HC
-              </div>
-              <span className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                HireConnect
-              </span>
-            </Link>
-            <h1 className="text-5xl font-extrabold text-slate-900 dark:text-white leading-tight">
-              Start your journey <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-violet-600">to success.</span>
-            </h1>
-            <p className="text-lg text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-md">
-              Join 98,000+ professionals discovering world-class career opportunities every day.
-            </p>
-          </div>
-
-          <div className="space-y-6">
-            {[
-              { icon: Zap, text: 'Personalized job recommendations', color: 'text-amber-500' },
-              { icon: ShieldCheck, text: 'Verified company profiles', color: 'text-blue-500' },
-              { icon: CheckCircle2, text: 'Direct application tracking', color: 'text-emerald-500' },
-            ].map((item, idx) => (
-              <div key={idx} className="flex items-center space-x-4 p-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
-                <div className={`p-2 rounded-xl bg-slate-50 dark:bg-slate-800 ${item.color}`}>
-                  <item.icon className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-slate-700 dark:text-slate-300">{item.text}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="pt-6 border-t border-slate-200 dark:border-slate-800">
-            <div className="flex -space-x-3 mb-4">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-950 bg-slate-200 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
-                  <img src={`https://i.pravatar.cc/100?u=${i + 10}`} alt="user" className="w-full h-full object-cover" />
-                </div>
-              ))}
-              <div className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-950 bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">
-                +2k
+    <div className="auth-page">
+      <div className="auth-left">
+        <div className="auth-brand">
+          <Link to="/" className="auth-logo">
+            <span className="logo-icon">HC</span>
+            <span className="logo-text">HireConnect</span>
+          </Link>
+        </div>
+        <div className="auth-illustration">
+          <div className="auth-steps-display">
+            <div className={`auth-step-item ${step >= 1 ? 'done' : ''}`}>
+              <div className="step-circle">1</div>
+              <div>
+                <div className="step-title">Create Account</div>
+                <div className="step-sub">Fill in your details</div>
               </div>
             </div>
-            <p className="text-sm text-slate-500 font-medium">Joined by 2,000+ professionals this week</p>
+            <div className="step-line" />
+            <div className={`auth-step-item ${step >= 2 ? 'done' : ''}`}>
+              <div className="step-circle">2</div>
+              <div>
+                <div className="step-title">Verify Email</div>
+                <div className="step-sub">Enter the OTP sent to you</div>
+              </div>
+            </div>
+            <div className="step-line" />
+            <div className="auth-step-item">
+              <div className="step-circle">3</div>
+              <div>
+                <div className="step-title">Start Hiring</div>
+                <div className="step-sub">Browse and apply to jobs</div>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Right Section: Form Card */}
-        <div className="w-full animate-in fade-in slide-in-from-right-8 duration-1000">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[40px] p-8 sm:p-12 shadow-2xl shadow-slate-200/50 dark:shadow-none">
-            {step === 1 ? (
-              <>
-                <div className="mb-10 text-center lg:text-left">
-                  <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">Create Account</h2>
-                  <p className="text-slate-500 dark:text-slate-400 font-medium">Join HireConnect and find your dream role</p>
+      <div className="auth-right">
+        <div className="auth-box fade-in">
+          {step === 1 ? (
+            <>
+              <h1 className="auth-title">Create account</h1>
+              <p className="auth-sub">Join thousands of professionals on HireConnect</p>
+
+              <form onSubmit={handleRegister} className="auth-form">
+                <div className="form-group">
+                  <label>Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
+                  />
                 </div>
 
-                <form onSubmit={handleRegister} className="space-y-5">
-                  <div className="space-y-2 group">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 ml-1 uppercase tracking-wider flex items-center">
-                      <User className="w-3.5 h-3.5 mr-1.5" /> Full Name
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:text-white font-medium shadow-sm"
-                      placeholder="Enter your name"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2 group">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 ml-1 uppercase tracking-wider flex items-center">
-                      <Mail className="w-3.5 h-3.5 mr-1.5" /> Email Address
-                    </label>
-                    <input
-                      type="email"
-                      className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:text-white font-medium shadow-sm"
-                      placeholder="you@example.com"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="space-y-2 group">
-                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 ml-1 uppercase tracking-wider flex items-center">
-                        <Lock className="w-3.5 h-3.5 mr-1.5" /> Password
-                      </label>
-                      <input
-                        type="password"
-                        className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:text-white font-medium shadow-sm"
-                        placeholder="••••••••"
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        required
-                        minLength={8}
-                      />
-                    </div>
-                    <div className="space-y-2 group">
-                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 ml-1 uppercase tracking-wider flex items-center">
-                        <Lock className="w-3.5 h-3.5 mr-1.5" /> Confirm
-                      </label>
-                      <input
-                        type="password"
-                        className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:text-white font-medium shadow-sm"
-                        placeholder="••••••••"
-                        value={form.confirmPassword}
-                        onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                        required
-                        minLength={8}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-4">
-                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl mb-8">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg">
-                          <Briefcase className="w-4 h-4" />
-                        </div>
-                        <span className="text-sm font-bold text-slate-900 dark:text-white">Account Type</span>
-                      </div>
-                      <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                        Registering as a <span className="font-bold text-blue-600">Job Seeker</span>. Recruiters should use the 
-                        <Link to="/recruiter-apply" className="text-blue-600 hover:underline ml-1 font-bold">Partner Portal →</Link>
-                      </p>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center space-x-2 disabled:opacity-70 group"
-                    >
-                      {loading ? (
-                        <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      ) : (
-                        <>
-                          <span>Create Free Account</span>
-                          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-
-                <div className="mt-10 pt-8 border-t border-slate-100 dark:border-slate-800 text-center">
-                  <p className="text-slate-500 font-medium">
-                    Already have an account?{' '}
-                    <Link to="/login" className="text-blue-600 hover:underline font-bold">Sign In</Link>
-                  </p>
-                </div>
-              </>
-            ) : (
-              /* OTP Step */
-              <div className="animate-in fade-in zoom-in-95 duration-500">
-                <div className="mb-10 text-center">
-                  <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-[30px] flex items-center justify-center mx-auto mb-6">
-                    <Mail className="w-10 h-10" />
-                  </div>
-                  <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">Check your inbox</h2>
-                  <p className="text-slate-500 dark:text-slate-400 font-medium">
-                    We've sent a 6-digit code to <span className="text-slate-900 dark:text-white font-bold">{form.email}</span>
-                  </p>
+                <div className="form-group">
+                  <label>Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    required
+                  />
                 </div>
 
-                <form onSubmit={handleVerifyOtp} className="space-y-8">
-                  <div className="space-y-2 group">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 ml-1 uppercase tracking-wider text-center block">
-                      Verification Code
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-5 py-5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-3xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:text-white text-center text-3xl font-bold tracking-[0.5em] shadow-sm"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      required
-                      maxLength={6}
-                      placeholder="000000"
-                    />
-                  </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <input
+                    type="password"
+                    placeholder="Min. 8 characters"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    required
+                    minLength={8}
+                  />
+                </div>
 
-                  <div className="space-y-4">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-2xl shadow-xl transition-all flex items-center justify-center space-x-2 disabled:opacity-70"
-                    >
-                      {loading ? (
-                        <div className="w-6 h-6 border-2 border-white/20 border-t-white dark:border-t-slate-900 rounded-full animate-spin"></div>
-                      ) : (
-                        <span>Verify & Create Account</span>
-                      )}
-                    </button>
+                <div className="form-group">
+                  <label>Confirm Password</label>
+                  <input
+                    type="password"
+                    placeholder="Re-enter password"
+                    value={form.confirmPassword}
+                    onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                    required
+                    minLength={8}
+                  />
+                </div>
+
+                {/* FIX: Removed ADMIN role option — backend forces CANDIDATE anyway.
+                    Admins are created via createInitialAdmin() endpoint.
+                    Recruiters use the separate /recruiter-apply flow. */}
+                <div className="form-group">
+                  <label>Account Type</label>
+                  <div className="role-toggle">
                     <button
                       type="button"
-                      onClick={() => setStep(1)}
-                      className="w-full py-4 bg-white dark:bg-slate-900 text-slate-500 hover:text-slate-900 dark:hover:text-white font-bold rounded-2xl transition-all"
+                      className="role-btn active"
+                      disabled
                     >
-                      Use a different email
+                      👤 Job Seeker
                     </button>
                   </div>
-                </form>
-
-                <div className="mt-10 text-center">
-                  <p className="text-xs text-slate-400 font-medium max-w-xs mx-auto">
-                    Didn't receive the code? Check your spam folder or wait a few minutes.
+                  <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 6 }}>
+                    Are you a recruiter? <Link to="/recruiter-apply">Apply as Recruiter →</Link>
                   </p>
                 </div>
+
+                <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
+                  {loading ? <span className="spinner" /> : null}
+                  {loading ? 'Sending OTP…' : 'Continue'}
+                </button>
+              </form>
+
+              <p className="auth-footer-text">
+                Already have an account? <Link to="/login">Sign In</Link>
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="otp-header">
+                <div className="otp-icon">📬</div>
+                <h1 className="auth-title">Check your inbox</h1>
+                <p className="auth-sub">We sent a 6-digit code to <strong>{form.email}</strong></p>
               </div>
-            )}
-          </div>
+
+              <form onSubmit={handleVerifyOtp} className="auth-form">
+                <div className="form-group">
+                  <label>Verification Code</label>
+                  <input
+                    type="text"
+                    placeholder="Enter 6-digit OTP"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    required
+                    maxLength={6}
+                    style={{ textAlign: 'center', letterSpacing: '0.3em', fontSize: '1.3rem' }}
+                  />
+                </div>
+
+                <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
+                  {loading ? <span className="spinner" /> : null}
+                  {loading ? 'Verifying…' : 'Verify & Create Account'}
+                </button>
+              </form>
+
+              <button
+                className="btn btn-ghost"
+                style={{ width: '100%', marginTop: 8 }}
+                onClick={() => setStep(1)}
+              >
+                ← Back
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

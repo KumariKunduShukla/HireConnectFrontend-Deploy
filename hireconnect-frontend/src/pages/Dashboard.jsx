@@ -5,49 +5,12 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '../utils/errorMessage';
 import ProfileCompleteness from '../components/ProfileCompleteness';
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  Star, 
-  Calendar, 
-  PartyPopper, 
-  Bell, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  ArrowUpRight,
-  ShieldCheck,
-  Users,
-  Building2,
-  FileText,
-  CreditCard,
-  RefreshCcw,
-  Search,
-  ExternalLink,
-  ChevronRight,
-  Trash2
-} from 'lucide-react';
-
-const STATUS_ICONS = {
-  Applied: Clock,
-  Shortlisted: Star,
-  'Interview Scheduled': Calendar,
-  Offered: PartyPopper,
-  Accepted: CheckCircle2,
-  Joined: ShieldCheck,
-  Rejected: XCircle,
-  Withdrawn: XCircle,
-};
+import './Dashboard.css';
 
 const STATUS_COLORS = {
-  Applied: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20',
-  Shortlisted: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20',
-  'Interview Scheduled': 'text-violet-500 bg-violet-50 dark:bg-violet-900/20',
-  Offered: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20',
-  Accepted: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20',
-  Joined: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20',
-  Rejected: 'text-rose-500 bg-rose-50 dark:bg-rose-900/20',
-  Withdrawn: 'text-slate-500 bg-slate-50 dark:bg-slate-900/20',
+  Applied: 'blue', Shortlisted: 'yellow',
+  'Interview Scheduled': 'purple', Offered: 'green', 
+  Accepted: 'green', Joined: 'green', Rejected: 'red',
 };
 
 export default function Dashboard() {
@@ -70,6 +33,7 @@ export default function Dashboard() {
         : user?.candidateId != null
           ? Number(user.candidateId)
           : null;
+  const notifUserId = user?.profileId ?? user?.userId ?? user?.id ?? null;
   const isAdmin = String(user?.role || '').toUpperCase() === 'ADMIN';
 
   const [allCandidates, setAllCandidates] = useState([]);
@@ -84,7 +48,14 @@ export default function Dashboard() {
       setLoading(true);
       try {
         if (isAdmin) {
-          const [p, c, r, s, j, a] = await Promise.all([
+          const [
+            pendingRes,
+            candidatesRes,
+            recruitersRes,
+            subsRes,
+            jobsRes,
+            appsRes
+          ] = await Promise.all([
             adminAPI.getPendingRecruiters().catch(() => ({ data: [] })),
             adminAPI.getAllUsers('CANDIDATE').catch(() => ({ data: [] })),
             adminAPI.getAllUsers('RECRUITER').catch(() => ({ data: [] })),
@@ -92,476 +63,602 @@ export default function Dashboard() {
             jobAPI.getAllJobs().catch(() => ({ data: [] })),
             applicationAPI.getAll().catch(() => ({ data: [] }))
           ]);
-          setPendingRecruiters(Array.isArray(p.data) ? p.data : []);
-          setAllCandidates(Array.isArray(c.data) ? c.data : []);
-          setAllRecruiters((Array.isArray(r.data) ? r.data : []).filter(x => x.status !== 'PENDING_APPROVAL'));
-          setAllSubscriptions(Array.isArray(s.data) ? s.data : []);
-          setAllJobs(Array.isArray(j.data) ? j.data : []);
-          setAllApps(Array.isArray(a.data) ? a.data : []);
+
+          setPendingRecruiters(Array.isArray(pendingRes.data) ? pendingRes.data : []);
+          setAllCandidates(Array.isArray(candidatesRes.data) ? candidatesRes.data : []);
+          setAllRecruiters((Array.isArray(recruitersRes.data) ? recruitersRes.data : []).filter(r => r.status !== 'PENDING_APPROVAL'));
+          setAllSubscriptions(Array.isArray(subsRes.data) ? subsRes.data : []);
+          setAllJobs(Array.isArray(jobsRes.data) ? jobsRes.data : []);
+          setAllApps(Array.isArray(appsRes.data) ? appsRes.data : []);
           return;
         }
 
-        const candidateIds = [...new Set([authUserId, profilePk].filter(x => x != null && !Number.isNaN(x)))];
-        const appsPromise = candidateIds.length === 0 ? Promise.resolve([]) : 
-          Promise.all(candidateIds.map(cid => applicationAPI.getByCandidate(cid).catch(() => ({ data: [] }))))
-          .then(responses => {
-            const merged = new Map();
-            responses.forEach(r => {
-              (r.data || []).forEach(a => merged.set(a.applicationId ?? `${a.candidateId}-${a.jobId}`, a));
-            });
-            return [...merged.values()].sort((a, b) => new Date(b.appliedAt) - new Date(a.appliedAt));
-          });
+        const candidateIds = [
+          ...new Set(
+            [authUserId, profilePk].filter((x) => x != null && !Number.isNaN(x))
+          ),
+        ];
 
-        const [appsList, jobsRes, notifsRes] = await Promise.all([
+        const appsPromise =
+          candidateIds.length === 0
+            ? Promise.resolve([])
+            : Promise.all(
+                candidateIds.map((cid) =>
+                  applicationAPI.getByCandidate(cid).catch(() => ({ data: [] }))
+                )
+              ).then((responses) => {
+                const merged = new Map();
+                responses.forEach((r) => {
+                  const list = Array.isArray(r.data) ? r.data : [];
+                  list.forEach((a) => {
+                    const key = a.applicationId ?? `${a.candidateId}-${a.jobId}`;
+                    merged.set(key, a);
+                  });
+                });
+                const arr = [...merged.values()];
+                arr.sort((a, b) => {
+                  const da = a.appliedAt ? new Date(a.appliedAt).getTime() : 0;
+                  const db = b.appliedAt ? new Date(b.appliedAt).getTime() : 0;
+                  return db - da;
+                });
+                return arr;
+              });
+
+        const jobsPromise = jobAPI.getAllJobs().catch(() => ({ data: [] }));
+
+        // Use all possible IDs for notifications to ensure we don't miss any
+        const notifIds = [...new Set([user?.profileId, user?.userId, user?.id].filter(id => id != null))];
+        const notifsPromise = notifIds.length === 0
+            ? Promise.resolve([])
+            : Promise.all(notifIds.map(id => notificationAPI.getByUser(id).catch(() => ({ data: [] }))))
+              .then(responses => {
+                const merged = new Map();
+                responses.forEach(r => {
+                  if (Array.isArray(r.data)) {
+                    r.data.forEach(n => merged.set(n.id || n.notificationId, n));
+                  }
+                });
+                const arr = [...merged.values()];
+                arr.sort((a, b) => (b.id || b.notificationId) - (a.id || a.notificationId));
+                return arr;
+              });
+
+        const [appsList, jobsRes, notifsList] = await Promise.all([
           appsPromise,
-          jobAPI.getAllJobs().catch(() => ({ data: [] })),
-          notificationAPI.getByUser(user?.profileId || user?.userId || user?.id).catch(() => ({ data: [] }))
+          jobsPromise,
+          notifsPromise,
         ]);
 
-        setApplications(appsList);
+        setApplications(Array.isArray(appsList) ? appsList : []);
+        const jobs = Array.isArray(jobsRes.data) ? jobsRes.data : [];
         const lookup = {};
-        (jobsRes.data || []).forEach(j => { lookup[j.jobId] = j; });
+        jobs.forEach((j) => {
+          lookup[j.jobId] = j;
+        });
         setJobsById(lookup);
-        setNotifications((notifsRes.data || []).sort((a, b) => (b.id || b.notificationId) - (a.id || a.notificationId)));
-
+        setNotifications(Array.isArray(notifsList) ? notifsList : []);
+        
+        // Fetch profile for completeness meter
         try {
           const profileRes = await import('../api').then(m => m.profileAPI.getMyProfile());
           const prof = profileRes?.data || null;
           setUserProfile(prof);
-          if (prof?.fullName || prof?.name) setUserName(prof.fullName || prof.name);
-        } catch {}
-
-      } catch (err) {
+          if (prof?.fullName) {
+             setUserName(prof.fullName);
+          } else if (prof?.name) {
+             setUserName(prof.name);
+          }
+        } catch (e) {
+          console.warn('Failed to fetch profile');
+        }
+        
+      } catch {
         toast.error('Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
     };
     loadData();
-  }, [isAdmin, authUserId, profilePk, user?.profileId, user?.userId, user?.id]);
+  }, [isAdmin, authUserId, profilePk, notifUserId]);
 
   const markRead = async (id) => {
     try {
       await notificationAPI.markRead(id);
-      setNotifications(prev => prev.map(n => (n.id === id || n.notificationId === id) ? { ...n, read: true } : n));
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     } catch {}
   };
 
   const withdrawApp = async (id) => {
-    if (!window.confirm('Are you sure you want to withdraw this application?')) return;
     try {
       await applicationAPI.withdrawApplication(id);
       setApplications(prev => prev.filter(a => a.applicationId !== id));
-      toast.success('Application withdrawn successfully');
+      toast.success('Application withdrawn');
     } catch (err) {
       toast.error(getErrorMessage(err, 'Failed to withdraw'));
     }
   };
 
+  const getRecruiterId = (recruiter) => recruiter.profileId || recruiter.recruiterId || recruiter.id || recruiter.userId;
+
   const decideRecruiter = async (recruiter, decision) => {
-    const rid = recruiter.profileId || recruiter.recruiterId || recruiter.id || recruiter.userId;
-    setActionId(`${decision}-${rid}`);
+    const recruiterId = getRecruiterId(recruiter);
+    if (!recruiterId) {
+      toast.error('Recruiter id missing from server response');
+      return;
+    }
+
+    setActionId(`${decision}-${recruiterId}`);
     try {
       if (decision === 'approve') {
-        await adminAPI.approveRecruiter(rid);
-        toast.success('Recruiter approved successfully');
+        await adminAPI.approveRecruiter(recruiterId);
+        toast.success('Recruiter approved. OTP email sent.');
       } else {
-        await adminAPI.rejectRecruiter(rid);
-        toast.success('Recruiter application rejected');
+        await adminAPI.rejectRecruiter(recruiterId);
+        toast.success('Recruiter rejected.');
       }
-      setPendingRecruiters(prev => prev.filter(r => (r.profileId || r.recruiterId || r.id || r.userId) !== rid));
+      setPendingRecruiters(prev => prev.filter(item => getRecruiterId(item) !== recruiterId));
     } catch (err) {
-      toast.error(getErrorMessage(err, `Failed to ${decision} recruiter`));
+      const data = err.response?.data;
+      toast.error(typeof data === 'string' ? data : data?.message || `Failed to ${decision} recruiter`);
     } finally {
       setActionId(null);
     }
   };
 
-  const candidateStats = [
-    { label: 'Applied', value: applications.length, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-    { label: 'Shortlisted', value: applications.filter(a => a.status === 'Shortlisted').length, icon: Star, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-    { label: 'Interviews', value: applications.filter(a => a.status === 'Interview Scheduled').length, icon: Calendar, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-900/20' },
-    { label: 'Offers', value: applications.filter(a => ['Offered', 'Accepted', 'Joined'].includes(a.status)).length, icon: PartyPopper, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+  const stats = [
+    { label: 'Total Applied', value: applications.length, icon: '📋' },
+    { label: 'Shortlisted', value: applications.filter(a => a.status === 'Shortlisted').length, icon: '⭐' },
+    { label: 'Interviews', value: applications.filter(a => a.status === 'Interview Scheduled').length, icon: '🗓️' },
+    { label: 'Offers & Joins', value: applications.filter(a => ['Offered', 'Accepted', 'Joined'].includes(a.status)).length, icon: '🎉' },
   ];
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-12 space-y-8 animate-pulse">
-        <div className="flex flex-col md:flex-row justify-between gap-6">
-          <div className="h-12 w-64 bg-slate-100 dark:bg-slate-800 rounded-2xl"></div>
-          <div className="h-12 w-48 bg-slate-100 dark:bg-slate-800 rounded-2xl"></div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-slate-50 dark:bg-slate-900 rounded-[32px]"></div>)}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 h-[600px] bg-slate-50 dark:bg-slate-900 rounded-[32px]"></div>
-          <div className="h-[400px] bg-slate-50 dark:bg-slate-900 rounded-[32px]"></div>
+  if (loading) return (
+    <div className="dashboard-page page">
+      <div className="container dash-container">
+        <div className="dash-loading">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="skeleton" style={{ height: 90, borderRadius: 12 }} />
+          ))}
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (isAdmin) {
-    const adminStats = [
-      { label: 'Pending', value: pendingRecruiters.length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-      { label: 'Candidates', value: allCandidates.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-      { label: 'Recruiters', value: allRecruiters.length, icon: Building2, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-900/20' },
-      { label: 'Active Jobs', value: allJobs.length, icon: Briefcase, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-    ];
-
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-8 lg:py-12 space-y-10 animate-in fade-in duration-700">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-1">
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-              <ShieldCheck className="w-10 h-10 text-blue-600" /> Admin Command Center
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400 font-medium">System-wide monitoring and governance portal.</p>
+  if (isAdmin) return (
+    <div className="dashboard-page page admin-dashboard">
+      <div className="container dash-container">
+        <div className="dash-header fade-in" style={{ marginBottom: '24px' }}>
+          <div>
+            <h1 className="section-title">Admin Command Center</h1>
+            <p className="section-sub">System-wide overview and management</p>
           </div>
-          <button onClick={() => window.location.reload()} className="flex items-center justify-center space-x-2 px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-bold rounded-2xl shadow-sm hover:bg-slate-50 transition-all">
-            <RefreshCcw className="w-5 h-5" />
-            <span>Refresh System Data</span>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setLoading(true);
+              Promise.all([
+                adminAPI.getPendingRecruiters().catch(() => ({ data: [] })),
+                adminAPI.getAllUsers('CANDIDATE').catch(() => ({ data: [] })),
+                adminAPI.getAllUsers('RECRUITER').catch(() => ({ data: [] })),
+                import('../api').then(m => m.subscriptionAPI.getAll()).catch(() => ({ data: [] })),
+                jobAPI.getAllJobs().catch(() => ({ data: [] })),
+                applicationAPI.getAll().catch(() => ({ data: [] }))
+              ]).then(([p, c, r, s, j, a]) => {
+                setPendingRecruiters(Array.isArray(p.data) ? p.data : []);
+                setAllCandidates(Array.isArray(c.data) ? c.data : []);
+                setAllRecruiters((Array.isArray(r.data) ? r.data : []).filter(x => x.status !== 'PENDING_APPROVAL'));
+                setAllSubscriptions(Array.isArray(s.data) ? s.data : []);
+                setAllJobs(Array.isArray(j.data) ? j.data : []);
+                setAllApps(Array.isArray(a.data) ? a.data : []);
+              }).finally(() => setLoading(false));
+            }}
+          >
+            Refresh Data
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {adminStats.map(s => (
-            <div key={s.label} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[32px] p-6 shadow-sm hover:shadow-md transition-all group">
-              <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                <s.icon className="w-6 h-6" />
-              </div>
-              <p className="text-3xl font-extrabold text-slate-900 dark:text-white mb-1">{s.value}</p>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
-            </div>
+        {/* Global Quick Stats */}
+        <div className="dash-stats fade-in" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: '32px' }}>
+          <div className="stat-card card">
+            <div className="stat-icon" style={{ background: 'rgba(234,179,8,0.1)', color: '#eab308' }}>⌛</div>
+            <div className="stat-value">{pendingRecruiters.length}</div>
+            <div className="stat-label">Pending Approvals</div>
+          </div>
+          <div className="stat-card card">
+            <div className="stat-icon" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>👥</div>
+            <div className="stat-value">{allCandidates.length}</div>
+            <div className="stat-label">Total Candidates</div>
+          </div>
+          <div className="stat-card card">
+            <div className="stat-icon" style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}>🏢</div>
+            <div className="stat-value">{allRecruiters.length}</div>
+            <div className="stat-label">Total Recruiters</div>
+          </div>
+          <div className="stat-card card">
+            <div className="stat-icon" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>💼</div>
+            <div className="stat-value">{allJobs.length}</div>
+            <div className="stat-label">Jobs Posted</div>
+          </div>
+          <div className="stat-card card">
+            <div className="stat-icon" style={{ background: 'rgba(244,63,94,0.1)', color: '#f43f5e' }}>📝</div>
+            <div className="stat-value">{allApps.length}</div>
+            <div className="stat-label">Applications</div>
+          </div>
+          <div className="stat-card card">
+            <div className="stat-icon" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>💳</div>
+            <div className="stat-value">{allSubscriptions.length}</div>
+            <div className="stat-label">Subscriptions</div>
+          </div>
+        </div>
+
+        {/* Admin Tabs Navigation */}
+        <div className="admin-tabs" style={{ display: 'flex', gap: '12px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+          {[
+            { id: 'approvals', label: `Pending Approvals (${pendingRecruiters.length})` },
+            { id: 'recruiters', label: `Recruiters (${allRecruiters.length})` },
+            { id: 'candidates', label: `Candidates (${allCandidates.length})` },
+            { id: 'jobs', label: `Jobs (${allJobs.length})` },
+            { id: 'subscriptions', label: `Subscriptions (${allSubscriptions.length})` },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              className={`btn ${adminTab === tab.id ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setAdminTab(tab.id)}
+              style={{ borderRadius: '20px', padding: '8px 16px' }}
+            >
+              {tab.label}
+            </button>
           ))}
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[40px] overflow-hidden shadow-sm">
-          <div className="flex border-b border-slate-100 dark:border-slate-800 overflow-x-auto no-scrollbar">
-            {[
-              { id: 'approvals', label: 'Pending', icon: Clock },
-              { id: 'recruiters', label: 'Recruiters', icon: Building2 },
-              { id: 'candidates', label: 'Candidates', icon: Users },
-              { id: 'jobs', label: 'Jobs', icon: Briefcase },
-              { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setAdminTab(tab.id)}
-                className={`flex items-center space-x-2 px-8 py-5 text-sm font-bold transition-all whitespace-nowrap border-b-2 ${
-                  adminTab === tab.id 
-                    ? 'text-blue-600 border-blue-600 bg-blue-50/50 dark:bg-blue-900/10' 
-                    : 'text-slate-500 border-transparent hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-                {tab.id === 'approvals' && pendingRecruiters.length > 0 && (
-                  <span className="ml-2 px-1.5 py-0.5 bg-rose-500 text-white text-[10px] rounded-full">{pendingRecruiters.length}</span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          <div className="p-8">
-            {adminTab === 'approvals' && (
-              <div className="space-y-6">
-                {pendingRecruiters.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-                    <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 rounded-[32px] flex items-center justify-center">
-                      <CheckCircle2 className="w-10 h-10" />
-                    </div>
-                    <p className="text-slate-500 font-bold">Queue clear! All applications reviewed.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {pendingRecruiters.map(r => {
-                      const rid = r.profileId || r.recruiterId || r.id || r.userId;
-                      return (
-                        <div key={rid} className="p-6 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-[32px] flex flex-col justify-between space-y-6">
-                          <div className="flex items-start justify-between">
-                            <div className="space-y-1">
-                              <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight">{r.fullName || r.name || r.email}</h3>
-                              <p className="text-sm text-slate-500 font-medium">{r.email}</p>
-                              {r.companyName && <p className="text-xs font-bold text-blue-600 uppercase tracking-widest pt-2 flex items-center"><Building2 className="w-3 h-3 mr-1" /> {r.companyName}</p>}
-                            </div>
-                            <span className="px-2.5 py-1 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] font-bold rounded-lg uppercase">Pending</span>
+        {/* Tab Content */}
+        <div className="admin-tab-content">
+          
+          {adminTab === 'approvals' && (
+            <div className="fade-in">
+              {pendingRecruiters.length === 0 ? (
+                <div className="dash-empty card">
+                  <div className="dash-empty-icon">✅</div>
+                  <p>No recruiter applications are waiting for review.</p>
+                </div>
+              ) : (
+                <div className="approval-list">
+                  {pendingRecruiters.map((recruiter) => {
+                    const recruiterId = getRecruiterId(recruiter);
+                    return (
+                      <div key={recruiterId || recruiter.email} className="approval-item card">
+                        <div className="approval-main">
+                          <div>
+                            <h3>{recruiter.fullName || recruiter.name || recruiter.email}</h3>
+                            <p>{recruiter.email}</p>
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <button 
-                              disabled={!!actionId}
-                              onClick={() => decideRecruiter(r, 'approve')}
-                              className="py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all text-sm disabled:opacity-50"
-                            >
-                              {actionId === `approve-${rid}` ? '...' : 'Approve'}
-                            </button>
-                            <button 
-                              disabled={!!actionId}
-                              onClick={() => decideRecruiter(r, 'reject')}
-                              className="py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-rose-600 font-bold rounded-2xl transition-all text-sm disabled:opacity-50"
-                            >
-                              {actionId === `reject-${rid}` ? '...' : 'Reject'}
-                            </button>
-                          </div>
+                          <span className="badge badge-yellow">{recruiter.status || 'PENDING_APPROVAL'}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {(adminTab === 'recruiters' || adminTab === 'candidates') && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 dark:border-slate-800">
-                      <th className="pb-6 pl-4">Identity</th>
-                      <th className="pb-6">Role</th>
-                      <th className="pb-6">Joined</th>
-                      <th className="pb-6 text-right pr-4">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                    {(adminTab === 'recruiters' ? allRecruiters : allCandidates).map(u => (
-                      <tr key={u.userId} className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                        <td className="py-5 pl-4">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl flex items-center justify-center text-slate-500 font-bold">
-                              {(u.email?.[0] || 'U').toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-slate-900 dark:text-white">{u.email}</p>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">ID: #{u.userId}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-5">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                            u.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-slate-100 text-slate-500'
-                          }`}>
-                            {u.status}
-                          </span>
-                        </td>
-                        <td className="py-5 text-sm font-medium text-slate-500">
-                          {new Date(u.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="py-5 text-right pr-4">
-                          <button className="p-2 text-slate-400 hover:text-rose-600 transition-colors">
-                            <Trash2 className="w-4 h-4" />
+                        <div className="approval-actions" style={{ marginTop: '16px' }}>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            disabled={!!actionId}
+                            onClick={() => decideRecruiter(recruiter, 'approve')}
+                          >
+                            {actionId === `approve-${recruiterId}` ? 'Approving...' : 'Approve'}
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                          <button
+                            className="btn btn-danger btn-sm"
+                            disabled={!!actionId}
+                            onClick={() => decideRecruiter(recruiter, 'reject')}
+                          >
+                            {actionId === `reject-${recruiterId}` ? 'Rejecting...' : 'Reject'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
-            {adminTab === 'jobs' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 dark:border-slate-800">
-                      <th className="pb-6 pl-4">Job Title</th>
-                      <th className="pb-6">Company</th>
-                      <th className="pb-6">Apps</th>
-                      <th className="pb-6 text-right pr-4">Link</th>
+          {adminTab === 'recruiters' && (
+            <div className="fade-in card" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>ID</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Email</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Status</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Joined</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allRecruiters.map(r => (
+                    <tr key={r.userId} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px', color: 'var(--text3)' }}>#{r.userId}</td>
+                      <td style={{ padding: '12px', color: 'var(--text)', fontWeight: 500 }}>{r.email}</td>
+                      <td style={{ padding: '12px' }}><span className={`badge badge-${r.status === 'ACTIVE' ? 'green' : 'gray'}`}>{r.status}</span></td>
+                      <td style={{ padding: '12px', color: 'var(--text2)' }}>{new Date(r.createdAt).toLocaleDateString()}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                    {allJobs.map(j => {
-                      const count = allApps.filter(a => a.jobId === j.jobId).length;
-                      return (
-                        <tr key={j.jobId} className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                          <td className="py-5 pl-4">
-                            <div className="space-y-0.5">
-                              <p className="text-sm font-bold text-slate-900 dark:text-white">{j.title}</p>
-                              <p className="text-[10px] font-bold text-slate-400">ROLE ID: #{j.jobId}</p>
-                            </div>
-                          </td>
-                          <td className="py-5">
-                            <span className="text-xs font-bold text-blue-600 uppercase flex items-center"><Building2 className="w-3 h-3 mr-1" /> {j.company}</span>
-                          </td>
-                          <td className="py-5">
-                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] font-bold rounded-md">{count} APPS</span>
-                          </td>
-                          <td className="py-5 text-right pr-4">
-                            <Link to={`/jobs/${j.jobId}`} className="p-2 text-slate-400 hover:text-blue-600 transition-colors inline-block">
-                              <ExternalLink className="w-4 h-4" />
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Candidate Dashboard
-  const greeting = userName || (user?.email && !user.email.includes('@') ? user.email : user?.email?.split('@')[0]) || 'Friend';
-
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-8 lg:py-12 space-y-10 animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-1">
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Welcome back, <span className="text-blue-600">{greeting}</span> 👋
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 font-medium">Your professional progress and opportunities at a glance.</p>
-        </div>
-        <Link to="/jobs" className="flex items-center justify-center space-x-2 px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-xl shadow-blue-600/20 transition-all group">
-          <span>Find New Opportunities</span>
-          <ArrowUpRight className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {candidateStats.map(s => (
-          <div key={s.label} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-6 shadow-sm hover:shadow-md transition-all group">
-            <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-              <s.icon className="w-6 h-6" />
+                  ))}
+                  {allRecruiters.length === 0 && <tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center' }}>No recruiters found.</td></tr>}
+                </tbody>
+              </table>
             </div>
-            <p className="text-3xl font-extrabold text-slate-900 dark:text-white mb-1">{s.value}</p>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
-          </div>
-        ))}
-      </div>
+          )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* Main Feed: Applications */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <LayoutDashboard className="w-5 h-5 text-blue-600" /> Active Applications
-            </h2>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{applications.length} total</span>
-          </div>
-
-          {applications.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-[40px] p-16 text-center space-y-6">
-              <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-[30px] flex items-center justify-center mx-auto text-slate-300">
-                <FileText className="w-10 h-10" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">No applications yet</h3>
-                <p className="text-slate-500 font-medium max-w-xs mx-auto">Start your journey by applying to your first job today.</p>
-              </div>
-              <Link to="/jobs" className="inline-block px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-2xl transition-all">
-                Browse Jobs
-              </Link>
+          {adminTab === 'candidates' && (
+            <div className="fade-in card" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>ID</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Email</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Status</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Joined</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allCandidates.map(c => (
+                    <tr key={c.userId} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px', color: 'var(--text3)' }}>#{c.userId}</td>
+                      <td style={{ padding: '12px', color: 'var(--text)', fontWeight: 500 }}>{c.email}</td>
+                      <td style={{ padding: '12px' }}><span className={`badge badge-${c.status === 'ACTIVE' ? 'green' : 'gray'}`}>{c.status}</span></td>
+                      <td style={{ padding: '12px', color: 'var(--text2)' }}>{new Date(c.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                  {allCandidates.length === 0 && <tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center' }}>No candidates found.</td></tr>}
+                </tbody>
+              </table>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {applications.map(app => {
-                const job = jobsById[app.jobId];
-                const StatusIcon = STATUS_ICONS[app.status] || Clock;
-                return (
-                  <div key={app.applicationId} className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-6 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-300">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="flex items-center space-x-5">
-                        <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl flex items-center justify-center text-white font-extrabold text-2xl shadow-lg shadow-blue-600/20">
-                          {(job?.title?.[0] || 'J').toUpperCase()}
-                        </div>
-                        <div className="space-y-1">
-                          <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight group-hover:text-blue-600 transition-colors">
-                            {job?.title || 'Unknown Role'}
-                          </h3>
-                          <div className="flex items-center text-slate-500 dark:text-slate-400 text-sm font-medium">
-                            <span className="font-bold text-blue-600 dark:text-blue-400 mr-2">{job?.company || 'Company'}</span>
-                            <span>• {app.appliedAt || 'Applied recently'}</span>
-                          </div>
-                        </div>
-                      </div>
+          )}
 
-                      <div className="flex items-center space-x-3">
-                        <div className={`px-4 py-2 rounded-2xl flex items-center space-x-2 font-bold text-xs uppercase tracking-wider ${STATUS_COLORS[app.status] || 'bg-slate-100 text-slate-600'}`}>
-                          <StatusIcon className="w-4 h-4" />
-                          <span>{app.status}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Link to={`/jobs/${app.jobId}`} className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400 hover:text-blue-600 transition-colors">
-                            <ExternalLink className="w-5 h-5" />
-                          </Link>
-                          {app.status === 'Applied' && (
-                            <button 
-                              onClick={() => withdrawApp(app.applicationId)}
-                              className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400 hover:text-rose-600 transition-colors"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+          {adminTab === 'jobs' && (
+            <div className="fade-in card" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Job ID</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Title</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Company</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Recruiter ID</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Apps Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allJobs.map(j => {
+                    const jobApps = allApps.filter(a => a.jobId === j.jobId).length;
+                    return (
+                    <tr key={j.jobId} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px', color: 'var(--text3)' }}>#{j.jobId}</td>
+                      <td style={{ padding: '12px', color: 'var(--text)', fontWeight: 500 }}>{j.title}</td>
+                      <td style={{ padding: '12px', color: 'var(--text2)' }}>{j.company}</td>
+                      <td style={{ padding: '12px', color: 'var(--text3)' }}>{j.postedBy || 'N/A'}</td>
+                      <td style={{ padding: '12px' }}><span className="badge badge-blue">{jobApps}</span></td>
+                    </tr>
+                  )})}
+                  {allJobs.length === 0 && <tr><td colSpan="5" style={{ padding: '24px', textAlign: 'center' }}>No jobs found.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {adminTab === 'subscriptions' && (
+            <div className="fade-in card" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Sub ID</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Recruiter ID</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Plan Code</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Status</th>
+                    <th style={{ padding: '12px', color: 'var(--text)' }}>Expires</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allSubscriptions.map(s => (
+                    <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px', color: 'var(--text3)' }}>#{s.id}</td>
+                      <td style={{ padding: '12px', color: 'var(--text2)' }}>#{s.recruiterId}</td>
+                      <td style={{ padding: '12px', fontWeight: 'bold', color: s.planCode === 'ENTERPRISE' ? '#a855f7' : '#3b82f6' }}>{s.planCode}</td>
+                      <td style={{ padding: '12px' }}><span className={`badge badge-${s.status === 'ACTIVE' ? 'green' : 'gray'}`}>{s.status}</span></td>
+                      <td style={{ padding: '12px', color: 'var(--text3)' }}>{s.endDate ? new Date(s.endDate).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                  {allSubscriptions.length === 0 && <tr><td colSpan="5" style={{ padding: '24px', textAlign: 'center' }}>No subscriptions found.</td></tr>}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
-        {/* Sidebar: Profile & Notifications */}
-        <div className="space-y-8">
-          <ProfileCompleteness profile={userProfile} role={user?.role} />
+      </div>
+    </div>
+  );
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-6 shadow-sm space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Bell className="w-4 h-4 text-blue-600" /> Notifications
-              </h3>
+  let displayGreeting = userName || user?.fullName;
+  if (!displayGreeting || displayGreeting === user?.email) {
+    const regName = localStorage.getItem('hc_fullName');
+    const authName = (user?.name && user.name !== user.email) ? user.name : null;
+    displayGreeting = regName || authName || user?.email || '';
+  }
+  if (displayGreeting && displayGreeting.includes('@')) {
+    displayGreeting = displayGreeting.split('@')[0];
+  }
+
+  return (
+    <div className="dashboard-page page">
+      <div className="container dash-container">
+        {/* Header */}
+        <div className="dash-header fade-in">
+          <div>
+            <h1 className="section-title">
+              Welcome back{displayGreeting ? `, ${displayGreeting}` : ''} 👋
+            </h1>
+            <p className="section-sub">Here's your job search activity at a glance</p>
+          </div>
+          <Link to="/jobs" className="btn btn-primary">Browse Jobs</Link>
+        </div>
+
+        {/* Stats */}
+        <div className="dash-stats fade-in">
+          {stats.map(s => (
+            <div key={s.label} className="stat-card card">
+              <div className="stat-icon">{s.icon}</div>
+              <div className="stat-value">{s.value}</div>
+              <div className="stat-label">{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="dash-grid">
+          {/* Applications */}
+          <div className="dash-col dash-col-main">
+            <div className="dash-section-header">
+              <h2 className="dash-section-title">My Applications</h2>
+              <span className="badge badge-gray">{applications.length} total</span>
+            </div>
+
+            {applications.length === 0 ? (
+              <div className="dash-empty card">
+                <div className="dash-empty-icon">📝</div>
+                <p>No applications yet.</p>
+                <Link to="/jobs" className="btn btn-primary">Find Jobs</Link>
+              </div>
+            ) : (
+              <div className="app-list">
+                {applications.map((app) => {
+                  const job = jobsById[app.jobId];
+                  const title = job?.title || `Job #${app.jobId}`;
+                  const meta = [job?.location, job?.type, job?.category].filter(Boolean).join(' · ');
+                  return (
+                  <div key={app.applicationId} className="app-item card">
+                    <div className="app-item-top">
+                      <div className="app-job-info">
+                        <div className="app-job-title">{title} <span style={{fontSize: '0.85em', color: '#94a3b8', fontWeight: 'normal'}}>at {job?.company || 'Unknown Company'}</span></div>
+                        {meta && <div className="app-job-meta">{meta}</div>}
+                        <div className="app-date">Applied: {app.appliedAt || '—'}</div>
+                      </div>
+                    </div>
+                    
+                    {/* Visual Progress Timeline */}
+                    <div className="app-timeline-container">
+                      {app.status === 'Rejected' || app.status === 'Withdrawn' ? (
+                        <div className={`app-timeline-divergent badge-${app.status === 'Rejected' ? 'red' : 'gray'}`}>
+                          Application {app.status}
+                        </div>
+                      ) : (
+                        <div className="app-timeline">
+                          {['Applied', 'Shortlisted', 'Interview Scheduled', 'Offered', 'Joined'].map((step, idx, arr) => {
+                             const currentStatus = app.status;
+                             const statusMap = {
+                               'Applied': 0,
+                               'Shortlisted': 1,
+                               'Interview Scheduled': 2,
+                               'Offered': 3,
+                               'Accepted': 4,
+                               'Joined': 4
+                             };
+                             const currentIdx = statusMap[currentStatus] ?? 0;
+                             const isCompleted = idx <= currentIdx;
+                             const isActive = idx === currentIdx;
+                             return (
+                               <div key={step} className={`timeline-step ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''}`}>
+                                 <div className="timeline-circle"></div>
+                                 <div className="timeline-label">{step}</div>
+                                 {idx < arr.length - 1 && <div className="timeline-line"></div>}
+                               </div>
+                             );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {app.coverLetter && (
+                      <p className="app-cover">{app.coverLetter.slice(0, 80)}{app.coverLetter.length > 80 ? '…' : ''}</p>
+                    )}
+                    <div className="app-actions">
+                      <Link to={`/jobs/${app.jobId}`} className="btn btn-ghost btn-sm">View Job</Link>
+                      {app.status === 'Applied' && (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => withdrawApp(app.applicationId)}
+                        >
+                          Withdraw
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="dash-col dash-col-side">
+            <ProfileCompleteness profile={userProfile} role={user?.role} />
+
+            <div className="dash-section-header" style={{ marginTop: '24px' }}>
+              <h2 className="dash-section-title">Notifications</h2>
               {notifications.filter(n => !n.read).length > 0 && (
-                <span className="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-bold rounded-full animate-pulse">
-                  {notifications.filter(n => !n.read).length} NEW
+                <span className="badge badge-red">
+                  {notifications.filter(n => !n.read).length} unread
                 </span>
               )}
             </div>
 
-            <div className="space-y-4 max-h-[500px] overflow-y-auto no-scrollbar pr-1">
-              {notifications.length === 0 ? (
-                <div className="py-12 text-center space-y-2">
-                  <p className="text-slate-400 font-bold text-sm">Quiet for now</p>
-                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-medium">Notifications will appear here</p>
-                </div>
-              ) : (
-                notifications.map(n => {
-                  const id = n.id || n.notificationId;
-                  return (
-                    <div 
-                      key={id} 
-                      onClick={() => !n.read && markRead(id)}
-                      className={`p-4 rounded-[24px] border transition-all cursor-pointer group ${
-                        !n.read 
-                          ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/30' 
-                          : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-60 grayscale hover:grayscale-0 hover:opacity-100'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <span className={`px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-widest ${
-                          !n.read ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'
-                        }`}>
-                          {n.type}
-                        </span>
-                        {!n.read && <div className="w-2 h-2 bg-blue-600 rounded-full animate-ping"></div>}
-                      </div>
-                      <p className="text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3">
-                        {n.message?.includes('|') ? n.message.split('|')[0] : n.message}
-                      </p>
-                      <div className="mt-3 flex items-center justify-end">
-                        <ChevronRight className="w-3 h-3 text-slate-300 group-hover:translate-x-1 transition-transform" />
-                      </div>
+            {notifications.length === 0 ? (
+              <div className="dash-empty card">
+                <div className="dash-empty-icon">🔔</div>
+                <p>No notifications yet.</p>
+              </div>
+            ) : (
+              <div className="notif-list">
+                {notifications.slice(0, 10).map(n => (
+                  <div
+                    key={n.id || n.notificationId}
+                    className={`notif-item card ${!n.read ? 'unread' : ''}`}
+                    onClick={() => !n.read && markRead(n.id || n.notificationId)}
+                  >
+                    <div className="notif-top">
+                      <span className="notif-type badge badge-blue">{n.type}</span>
+                      {!n.read && <span className="notif-dot" />}
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    {(() => {
+                      if (!n.message) return null;
+                      const parts = n.message.split('|');
+                      if (parts.length > 1) {
+                        const header = parts[0];
+                        const details = parts.slice(1);
+                        return (
+                          <div className="notif-structured-message">
+                            <p className="notif-header" style={{ fontWeight: 600, marginBottom: '8px', color: '#fff' }}>{header}</p>
+                            <div className="notif-details-grid" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                              {details.map((detail, idx) => {
+                                const colonIdx = detail.indexOf(':');
+                                if (colonIdx > 0) {
+                                  const key = detail.substring(0, colonIdx).trim();
+                                  let value = detail.substring(colonIdx + 1).trim();
+                                  if (value.startsWith('http')) {
+                                    value = <a href={value} target="_blank" rel="noreferrer" style={{ color: '#4facfe', textDecoration: 'underline' }}>{value}</a>;
+                                  }
+                                  return (
+                                    <React.Fragment key={idx}>
+                                      <span style={{ color: '#8892b0', fontWeight: 500 }}>{key}:</span>
+                                      <span style={{ color: '#ccd6f6' }}>{value}</span>
+                                    </React.Fragment>
+                                  );
+                                }
+                                return <span key={idx} style={{ gridColumn: '1 / -1', color: '#ccd6f6' }}>{detail}</span>;
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return <p className="notif-message" style={{ whiteSpace: 'pre-line', color: '#ccd6f6' }}>{n.message}</p>;
+                    })()}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

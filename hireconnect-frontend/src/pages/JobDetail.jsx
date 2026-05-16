@@ -4,27 +4,7 @@ import { jobAPI, applicationAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '../utils/errorMessage';
-import { 
-  Building2, 
-  MapPin, 
-  Clock, 
-  Users, 
-  ChevronLeft, 
-  Briefcase, 
-  Trophy, 
-  Zap, 
-  ArrowRight,
-  ShieldCheck,
-  Globe,
-  DollarSign,
-  FileText,
-  Send,
-  X,
-  CheckCircle2,
-  Calendar,
-  Star,
-  PartyPopper
-} from 'lucide-react';
+import './JobDetail.css';
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -41,9 +21,17 @@ export default function JobDetail() {
   const role = String(user?.role || '').replace(/^ROLE_/, '').toUpperCase();
   const isCandidate = role === 'CANDIDATE';
 
-  const candidateId = user?.profileId ?? user?.id ?? user?.candidateId ?? user?.userId ?? null;
+  const candidateId =
+    user?.profileId ?? user?.id ?? user?.candidateId ?? user?.userId ?? null;
   const authUserId = user?.userId != null ? Number(user.userId) : null;
-  const profilePk = user?.profileId != null ? Number(user.profileId) : user?.id != null ? Number(user.id) : user?.candidateId != null ? Number(user.candidateId) : null;
+  const profilePk =
+    user?.profileId != null
+      ? Number(user.profileId)
+      : user?.id != null
+        ? Number(user.id)
+        : user?.candidateId != null
+          ? Number(user.candidateId)
+          : null;
 
   useEffect(() => {
     jobAPI.getJobById(id)
@@ -61,18 +49,24 @@ export default function JobDetail() {
       setAlreadyApplied(false);
       return;
     }
-    if ((authUserId == null || Number.isNaN(authUserId)) && (profilePk == null || Number.isNaN(profilePk))) {
+    if (
+      (authUserId == null || Number.isNaN(authUserId)) &&
+      (profilePk == null || Number.isNaN(profilePk))
+    ) {
       setAlreadyApplied(false);
       return;
     }
     let cancelled = false;
-    applicationAPI.getByJob(Number(id))
+    applicationAPI
+      .getByJob(Number(id))
       .then((res) => {
         const list = Array.isArray(res.data) ? res.data : [];
         const myApp = list.find((a) => {
           const cid = Number(a.candidateId ?? a.candidate_id);
           if (Number.isNaN(cid)) return false;
-          const mine = (profilePk != null && !Number.isNaN(profilePk) && cid === profilePk) || (authUserId != null && !Number.isNaN(authUserId) && cid === authUserId);
+          const mine =
+            (profilePk != null && !Number.isNaN(profilePk) && cid === profilePk) ||
+            (authUserId != null && !Number.isNaN(authUserId) && cid === authUserId);
           return mine && String(a.status || '').toLowerCase() !== 'withdrawn';
         });
         if (!cancelled) {
@@ -86,14 +80,23 @@ export default function JobDetail() {
           setMyApplication(null);
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [id, isLoggedIn, isCandidate, authUserId, profilePk]);
 
   const handleApply = async (e) => {
     e.preventDefault();
     if (!isLoggedIn) { navigate('/login'); return; }
-    if (!isCandidate) { toast.error('Only candidates can apply.'); return; }
-    if (!candidateId) { toast.error('Profile missing. Complete your profile.'); return; }
+    if (!isCandidate) {
+      toast.error('Only candidates can apply for jobs.');
+      return;
+    }
+
+    if (!candidateId) {
+      toast.error('Candidate profile is missing. Please complete your profile first.');
+      return;
+    }
 
     setApplying(true);
     try {
@@ -115,203 +118,204 @@ export default function JobDetail() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-12 animate-pulse space-y-12">
-        <div className="h-10 w-32 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          <div className="lg:col-span-2 space-y-8">
-            <div className="h-64 bg-slate-100 dark:bg-slate-800 rounded-[40px]"></div>
-            <div className="h-96 bg-slate-100 dark:bg-slate-800 rounded-[40px]"></div>
-          </div>
-          <div className="h-96 bg-slate-100 dark:bg-slate-800 rounded-[40px]"></div>
-        </div>
+  if (loading) return (
+    <div className="job-detail-page page">
+      <div className="container" style={{ paddingTop: 100 }}>
+        <div className="skeleton" style={{ height: 40, width: '50%', marginBottom: 20 }} />
+        <div className="skeleton" style={{ height: 20, width: '30%', marginBottom: 40 }} />
+        <div className="skeleton" style={{ height: 200 }} />
       </div>
-    );
-  }
+    </div>
+  );
 
   if (!job) return (
-    <div className="min-h-[70vh] flex flex-col items-center justify-center p-4">
-      <div className="w-24 h-24 bg-slate-50 dark:bg-slate-900 rounded-[40px] flex items-center justify-center text-slate-300 mb-6">
-        <Briefcase className="w-12 h-12" />
+    <div className="job-detail-page page">
+      <div className="container" style={{ paddingTop: 120, textAlign: 'center' }}>
+        <h2>Job not found</h2>
+        <Link to="/jobs" className="btn btn-primary" style={{ marginTop: 20 }}>Back to Jobs</Link>
       </div>
-      <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Job not found</h2>
-      <Link to="/jobs" className="mt-6 px-8 py-3 bg-blue-600 text-white font-bold rounded-2xl">Back to All Jobs</Link>
     </div>
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 lg:py-12 animate-in fade-in duration-700">
-      <Link to="/jobs" className="inline-flex items-center space-x-2 text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors mb-8 group">
-        <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-        <span>Back to Job Board</span>
-      </Link>
+    <div className="job-detail-page page">
+      <div className="container">
+        <div className="jd-layout">
+          {/* Main */}
+          <div className="jd-main fade-in">
+            <Link to="/jobs" className="jd-back">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m15 18-6-6 6-6"/>
+              </svg>
+              Back to Jobs
+            </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-10">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[40px] p-8 sm:p-10 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl"></div>
-            
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
-              <div className="flex items-start space-x-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-violet-600 rounded-[28px] flex items-center justify-center text-white font-extrabold text-3xl shadow-xl shadow-blue-600/20">
+            <div className="jd-header card">
+              <div className="jd-header-top">
+                <div className="jd-company-icon">
                   {(job.title?.[0] || 'J').toUpperCase()}
                 </div>
-                <div className="space-y-2">
-                  <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white leading-tight">
-                    {job.title}
-                  </h1>
-                  <div className="flex items-center space-x-3">
-                    <span className="text-lg font-bold text-blue-600 flex items-center">
-                      <Building2 className="w-5 h-5 mr-1.5" /> {job.company || 'InnovateCorp'}
-                    </span>
-                    <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] font-bold rounded-lg uppercase tracking-wider flex items-center">
-                      <ShieldCheck className="w-3 h-3 mr-1" /> Verified
+                <div className="jd-title-block">
+                  <h1 className="jd-title">{job.title}</h1>
+                  <div className="jd-company" style={{ fontSize: '1.2rem', color: '#6366f1', marginBottom: '12px', fontWeight: 500 }}>
+                    🏢 {job.company || 'Unknown Company'}
+                  </div>
+                  <div className="jd-meta-row">
+                    {job.location && (
+                      <span className="jd-meta-item">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                          <circle cx="12" cy="9" r="2.5"/>
+                        </svg>
+                        {job.location}
+                      </span>
+                    )}
+                    {job.postedAt && (
+                      <span className="jd-meta-item">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                          <line x1="16" y1="2" x2="16" y2="6"/>
+                          <line x1="8" y1="2" x2="8" y2="6"/>
+                          <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        Posted {job.postedAt}
+                      </span>
+                    )}
+                    <span className="jd-meta-item">
+                      👥 {appCount} applicants
                     </span>
                   </div>
                 </div>
+                <span className={`badge badge-${job.status === 'OPEN' ? 'green' : 'red'}`} style={{ marginLeft: 'auto' }}>
+                  {job.status}
+                </span>
               </div>
-              <div className={`px-4 py-1.5 rounded-xl text-xs font-bold uppercase tracking-[0.2em] border ${job.status === 'OPEN' ? 'text-emerald-600 border-emerald-100 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-900/30' : 'text-rose-600 border-rose-100 bg-rose-50'}`}>
-                {job.status}
+
+              <div className="jd-tags-row">
+                {job.type && <span className="badge badge-blue">{job.type}</span>}
+                {job.category && <span className="badge badge-purple">{job.category}</span>}
+                {job.experienceRequired > 0 && (
+                  <span className="badge badge-gray">{job.experienceRequired}+ yrs exp</span>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-12 pt-10 border-t border-slate-100 dark:border-slate-800">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Location</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-white flex items-center"><MapPin className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> {job.location || 'Remote'}</p>
+            {/* Description */}
+            {job.description && (
+              <div className="jd-section card">
+                <h2 className="jd-section-title">About this Role</h2>
+                <p className="jd-description">{job.description}</p>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Job Type</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-white flex items-center"><Clock className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> {job.type || 'Full-time'}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Applicants</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-white flex items-center"><Users className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> {appCount} active</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Posted</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-white flex items-center"><Calendar className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> {job.postedAt || 'Recently'}</p>
-              </div>
-            </div>
-          </div>
+            )}
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[40px] p-8 sm:p-10 shadow-sm space-y-10">
-            <section className="space-y-4">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Zap className="w-5 h-5 text-blue-600" /> Mission & Description
-              </h2>
-              <div className="text-slate-600 dark:text-slate-300 leading-relaxed space-y-4 font-medium">
-                {job.description?.split('\n').map((para, i) => (
-                  <p key={i}>{para}</p>
-                )) || 'Detailed description coming soon...'}
-              </div>
-            </section>
-
+            {/* Skills */}
             {job.skills?.length > 0 && (
-              <section className="space-y-4">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-blue-600" /> Skill Requirements
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {job.skills.map(skill => (
-                    <span key={skill} className="px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 shadow-sm">
-                      {skill}
-                    </span>
+              <div className="jd-section card">
+                <h2 className="jd-section-title">Required Skills</h2>
+                <div className="jd-skills">
+                  {job.skills.map(s => (
+                    <span key={s} className="jd-skill-tag">{s}</span>
                   ))}
                 </div>
-              </section>
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Sidebar */}
-        <div className="space-y-8">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-blue-600 dark:to-blue-700 rounded-[40px] p-8 text-white shadow-2xl shadow-slate-200/50 dark:shadow-blue-600/20">
-            <div className="space-y-8">
+          {/* Sidebar */}
+          <div className="jd-sidebar">
+            <div className="jd-apply-card card">
               {job.salaryMin && job.salaryMax && (
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-white/60 uppercase tracking-widest">Annual Compensation</p>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-4xl font-extrabold">₹{(job.salaryMin / 1000).toFixed(0)}K</span>
-                    <span className="text-white/60 font-bold"> – </span>
-                    <span className="text-4xl font-extrabold">₹{(job.salaryMax / 1000).toFixed(0)}K</span>
+                <div className="jd-salary">
+                  <div className="jd-salary-label">Salary Range</div>
+                  <div className="jd-salary-value">
+                    ₹{(job.salaryMin / 1000).toFixed(0)}K – ₹{(job.salaryMax / 1000).toFixed(0)}K/yr
                   </div>
                 </div>
               )}
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-white/10 rounded-2xl border border-white/10">
-                  <span className="text-xs font-bold text-white/60 uppercase tracking-wider">Experience</span>
-                  <span className="font-bold">{job.experienceRequired || '0-1'}+ Years</span>
-                </div>
-                <div className="flex items-center justify-between p-4 bg-white/10 rounded-2xl border border-white/10">
-                  <span className="text-xs font-bold text-white/60 uppercase tracking-wider">Category</span>
-                  <span className="font-bold">{job.category || 'Tech'}</span>
-                </div>
+              <div className="jd-info-list">
+                {job.type && (
+                  <div className="jd-info-item">
+                    <span className="jd-info-label">Job Type</span>
+                    <span className="jd-info-value">{job.type}</span>
+                  </div>
+                )}
+                {job.category && (
+                  <div className="jd-info-item">
+                    <span className="jd-info-label">Category</span>
+                    <span className="jd-info-value">{job.category}</span>
+                  </div>
+                )}
+                {job.experienceRequired > 0 && (
+                  <div className="jd-info-item">
+                    <span className="jd-info-label">Experience</span>
+                    <span className="jd-info-value">{job.experienceRequired}+ years</span>
+                  </div>
+                )}
               </div>
 
               {job.status === 'OPEN' && isCandidate && alreadyApplied ? (
-                <div className="space-y-6">
-                  <div className="w-full py-4 bg-white/20 border border-white/20 text-white font-bold rounded-2xl text-center">
-                    Successfully Applied
-                  </div>
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      padding: '13px',
+                      cursor: 'default',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text2)',
+                    }}
+                    disabled
+                  >
+                    You have applied for this job
+                  </button>
                   {myApplication && (
-                    <div className="space-y-6 bg-black/10 p-6 rounded-3xl border border-white/5">
-                      <p className="text-center text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Pipeline Status</p>
-                      <div className="space-y-4">
-                        {['Applied', 'Shortlisted', 'Interview Scheduled', 'Offered'].map((step, idx, arr) => {
-                          const statusOrder = ['Applied', 'Shortlisted', 'Interview Scheduled', 'Offered'];
-                          const currentIdx = statusOrder.indexOf(myApplication.status);
-                          const isCompleted = idx <= currentIdx;
-                          const isActive = idx === currentIdx;
-                          const StepIcon = [Clock, Star, Calendar, PartyPopper][idx];
-                          
-                          return (
-                            <div key={step} className={`flex items-center space-x-4 ${isCompleted ? 'opacity-100' : 'opacity-30'}`}>
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-white text-blue-600 scale-110 shadow-lg' : isCompleted ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white'}`}>
-                                <StepIcon className="w-5 h-5" />
-                              </div>
-                              <span className={`text-sm font-bold ${isActive ? 'text-white' : 'text-white/70'}`}>{step}</span>
-                              {isActive && <div className="ml-auto w-2 h-2 bg-white rounded-full animate-ping"></div>}
-                            </div>
-                          );
-                        })}
-                      </div>
+                    <div className="jd-app-timeline-container" style={{ marginTop: 24, padding: 16, border: '1px solid var(--border)', borderRadius: 12, backgroundColor: '#f8fafc' }}>
+                      <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text1)', textAlign: 'center' }}>Application Status Tracker</h4>
+                      {myApplication.status === 'Rejected' || myApplication.status === 'Withdrawn' ? (
+                        <div style={{ textAlign: 'center', fontWeight: 'bold', color: myApplication.status === 'Rejected' ? '#ef4444' : '#64748b' }}>
+                          Status: {myApplication.status}
+                        </div>
+                      ) : (
+                        <div className="app-timeline" style={{ flexDirection: 'column', gap: '20px' }}>
+                          {['Applied', 'Shortlisted', 'Interview Scheduled', 'Offered'].map((step, idx, arr) => {
+                             const currentIdx = arr.indexOf(myApplication.status) >= 0 ? arr.indexOf(myApplication.status) : 0;
+                             const isCompleted = idx <= currentIdx;
+                             const isActive = idx === currentIdx;
+                             return (
+                               <div key={step} className={`timeline-step ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''}`} style={{ flexDirection: 'row', alignItems: 'center', minHeight: '30px' }}>
+                                 <div className="timeline-circle" style={{ flexShrink: 0 }}></div>
+                                 <div className="timeline-label" style={{ marginLeft: '12px', fontSize: '13px', textAlign: 'left', fontWeight: isActive ? '600' : '500', color: isCompleted ? 'var(--accent)' : 'var(--text3)', marginTop: 0 }}>{step}</div>
+                                 {idx < arr.length - 1 && <div className="timeline-line" style={{ height: '20px', width: '2px', top: '100%', left: '10px', right: 'auto', bottom: 'auto', zIndex: 0 }}></div>}
+                               </div>
+                             );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
+                </>
               ) : job.status === 'OPEN' && isCandidate ? (
                 <button
+                  className="btn btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', padding: '13px' }}
                   onClick={() => (isLoggedIn ? setShowApplyModal(true) : navigate('/login'))}
-                  className="w-full py-5 bg-white text-blue-600 hover:bg-blue-50 font-extrabold rounded-2xl shadow-xl transition-all flex items-center justify-center space-x-2 group"
                 >
-                  <span>Apply for this role</span>
-                  <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                  Apply Now
                 </button>
+              ) : job.status === 'OPEN' && isLoggedIn && !isCandidate ? (
+                <div className="jd-closed-notice">Recruiter/Admin accounts cannot apply for jobs.</div>
               ) : (
-                <div className="p-4 bg-white/10 rounded-2xl border border-white/10 text-center text-sm font-bold opacity-60">
-                  {!isCandidate && isLoggedIn ? 'Recruiter account cannot apply' : 'Applications currently closed'}
-                </div>
+                <div className="jd-closed-notice">This position is no longer accepting applications.</div>
               )}
-              
+
               {!isLoggedIn && (
-                <p className="text-center text-xs font-bold text-white/40">
-                  <Link to="/login" className="text-white hover:underline">Sign in</Link> to submit your application
+                <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text3)', marginTop: 10 }}>
+                  <Link to="/login" style={{ color: 'var(--accent)' }}>Sign in</Link> to apply
                 </p>
               )}
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[40px] p-8 shadow-sm space-y-6">
-            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Globe className="w-4 h-4 text-blue-600" /> Share this Role
-            </h3>
-            <p className="text-xs text-slate-500 font-medium">Know someone perfect for this position? Share the link below.</p>
-            <div className="flex items-center space-x-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800">
-              <input readOnly value={window.location.href} className="flex-1 bg-transparent border-none text-[10px] font-bold text-slate-400 outline-none" />
-              <button onClick={() => { navigator.clipboard.writeText(window.location.href); toast.success('Link copied!'); }} className="text-[10px] font-bold text-blue-600 hover:underline">COPY</button>
             </div>
           </div>
         </div>
@@ -319,65 +323,43 @@ export default function JobDetail() {
 
       {/* Apply Modal */}
       {showApplyModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowApplyModal(false)}></div>
-          <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500">
-            <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <div className="space-y-1">
-                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Apply for Role</h2>
-                <p className="text-xs text-slate-500 font-medium">Applying to <span className="text-blue-600 font-bold">{job.title}</span></p>
-              </div>
-              <button onClick={() => setShowApplyModal(false)} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">
-                <X className="w-6 h-6" />
-              </button>
+        <div className="modal-overlay" onClick={() => setShowApplyModal(false)}>
+          <div className="modal fade-in" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Apply for {job.title}</h2>
+              <button className="modal-close" onClick={() => setShowApplyModal(false)}>✕</button>
             </div>
-            
-            <form onSubmit={handleApply} className="p-8 space-y-8">
-              <div className="space-y-2 group">
-                <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300 ml-1 uppercase tracking-wider flex items-center">
-                  <Globe className="w-3.5 h-3.5 mr-1.5" /> Resume URL
-                </label>
+            <form onSubmit={handleApply}>
+              <div className="form-group">
+                <label>Resume URL</label>
                 <input
                   type="url"
-                  className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:text-white font-medium"
                   placeholder="https://drive.google.com/your-resume"
                   value={appForm.resumeUrl}
                   onChange={e => setAppForm({ ...appForm, resumeUrl: e.target.value })}
-                  required
                 />
                 {!appForm.resumeUrl && user?.resumeUrl && (
-                  <p className="text-[10px] text-blue-600 font-bold ml-1 italic">Suggested: Your profile resume link</p>
+                  <div style={{ marginTop: 6, fontSize: '0.8rem', color: 'var(--text3)' }}>
+                    Using profile resume: {user.resumeUrl}
+                  </div>
                 )}
               </div>
-
-              <div className="space-y-2 group">
-                <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300 ml-1 uppercase tracking-wider flex items-center">
-                  <FileText className="w-3.5 h-3.5 mr-1.5" /> Cover Letter
-                </label>
+              <div className="form-group">
+                <label>Cover Letter</label>
                 <textarea
                   rows={5}
-                  className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:text-white font-medium"
-                  placeholder="Why are you the perfect candidate for this role?"
+                  placeholder="Tell the recruiter why you're a great fit for this role…"
                   value={appForm.coverLetter}
                   onChange={e => setAppForm({ ...appForm, coverLetter: e.target.value })}
-                  required
                 />
               </div>
-
-              <button
-                type="submit"
-                disabled={applying}
-                className="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-2xl shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center space-x-2 disabled:opacity-70 group"
-              >
-                {applying ? (
-                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : (
-                  <>
-                    <span>Submit Application</span>
-                    <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                  </>
-                )}
-              </button>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-ghost" onClick={() => setShowApplyModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={applying}>
+                  {applying ? <span className="spinner" /> : null}
+                  {applying ? 'Submitting…' : 'Submit Application'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
